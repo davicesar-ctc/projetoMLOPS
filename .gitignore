@@ -29,6 +29,8 @@ data/processed
 
 # MLflow
 mlruns/
+mlflow_data/
+mlflow.db
 
 # DVC local cache
 .dvc/cache/

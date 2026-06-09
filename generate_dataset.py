@@ -16,41 +16,51 @@ N_NORMAL = N_TOTAL - N_FRAUD
 def gen(n, fraud: bool):
     if fraud:
         transaction_type  = np.random.choice(['Payment', 'Transfer', 'Withdrawal'], n, p=[0.45, 0.40, 0.15])
-        payment_mode      = np.random.choice(['Card', 'NetBanking', 'UPI', 'Wallet'], n, p=[0.40, 0.20, 0.25, 0.15])
-        device_type       = np.random.choice(['Android', 'iOS', 'Web'], n, p=[0.40, 0.30, 0.30])
+        payment_mode      = np.random.choice(['Card', 'NetBanking', 'UPI', 'Wallet'], n, p=[0.38, 0.22, 0.25, 0.15])
+        device_type       = np.random.choice(['Android', 'iOS', 'Web'], n, p=[0.42, 0.32, 0.26])
         device_location   = np.random.choice(['Bangalore', 'Chennai', 'Delhi', 'Hyderabad', 'Mumbai'], n)
-        avg_amt           = np.random.uniform(100, 20000, n)
-        # Valor bem acima da média histórica
-        multiplier        = np.random.lognormal(1.2, 0.6, n)
+        avg_amt           = np.random.uniform(100, 25000, n)
+        # Valor acima da média histórica, mas com bastante sobreposição
+        multiplier        = np.random.lognormal(0.30, 0.50, n)
         transaction_amt   = np.clip(avg_amt * multiplier, 50, 50000)
-        _age = np.concatenate([np.random.randint(10, 60, int(n*0.5)),
-                               np.random.randint(60, 300, int(n*0.3)),
-                               np.random.randint(300, 2000, n - int(n*0.5) - int(n*0.3))])
+        # Contas tendem a ser mais novas, mas há fraudes em contas antigas
+        _age = np.concatenate([np.random.randint(10, 120, int(n*0.28)),
+                               np.random.randint(120, 600, int(n*0.30)),
+                               np.random.randint(600, 2000, n - int(n*0.28) - int(n*0.30))])
         np.random.shuffle(_age)
         account_age = _age
-        _hr = np.concatenate([np.random.randint(0, 5, int(n*0.45)),   # madrugada
-                              np.random.randint(5, 24, n - int(n*0.45))])
+        # ~25% na madrugada (sobrepõe com normais)
+        _hr = np.concatenate([np.random.randint(0, 6, int(n*0.25)),
+                              np.random.randint(6, 24, n - int(n*0.25))])
         np.random.shuffle(_hr)
         hour = _hr
-        failed            = np.random.choice([0,1,2,3,4], n, p=[0.05, 0.10, 0.20, 0.35, 0.30])
-        ip_risk           = np.random.beta(6, 2, n)                   # alto risco (0.6–1.0)
-        is_intl           = np.random.binomial(1, 0.35, n)
-        logins            = np.random.choice(range(1, 10), n, p=[0.02,0.03,0.05,0.10,0.15,0.20,0.20,0.15,0.10])
+        failed            = np.random.choice([0,1,2,3,4], n, p=[0.14, 0.22, 0.28, 0.21, 0.15])
+        ip_risk           = np.random.beta(3.3, 3.0, n)              # risco moderado-alto, sobrepõe
+        is_intl           = np.random.binomial(1, 0.22, n)
+        logins            = np.random.choice(range(1, 10), n, p=[0.10,0.14,0.16,0.16,0.14,0.12,0.08,0.06,0.04])
     else:
         transaction_type  = np.random.choice(['Payment', 'Transfer', 'Withdrawal'], n, p=[0.52, 0.33, 0.15])
         payment_mode      = np.random.choice(['Card', 'NetBanking', 'UPI', 'Wallet'], n, p=[0.33, 0.27, 0.25, 0.15])
-        device_type       = np.random.choice(['Android', 'iOS', 'Web'], n, p=[0.46, 0.36, 0.18])
+        device_type       = np.random.choice(['Android', 'iOS', 'Web'], n, p=[0.45, 0.35, 0.20])
         device_location   = np.random.choice(['Bangalore', 'Chennai', 'Delhi', 'Hyderabad', 'Mumbai'], n)
         avg_amt           = np.random.uniform(100, 30000, n)
-        # Valor próximo da média histórica
-        multiplier        = np.random.lognormal(0.0, 0.25, n)
+        # Valor próximo da média histórica, com variação
+        multiplier        = np.random.lognormal(0.10, 0.42, n)
         transaction_amt   = np.clip(avg_amt * multiplier, 50, 50000)
-        account_age       = np.random.randint(180, 2000, n)           # contas estabelecidas
-        hour              = np.random.randint(7, 22, n)               # horário comercial/noite cedo
-        failed            = np.random.choice([0,1,2,3,4], n, p=[0.55, 0.30, 0.10, 0.04, 0.01])
-        ip_risk           = np.random.beta(2, 7, n)                   # baixo risco (0.05–0.35)
-        is_intl           = np.random.binomial(1, 0.08, n)
-        logins            = np.random.choice(range(1, 10), n, p=[0.20,0.25,0.20,0.15,0.10,0.05,0.03,0.01,0.01])
+        # Contas em geral estabelecidas, mas com vários usuários novos legítimos
+        _age = np.concatenate([np.random.randint(15, 300, int(n*0.30)),
+                               np.random.randint(300, 2000, n - int(n*0.30))])
+        np.random.shuffle(_age)
+        account_age = _age
+        # Maioria de dia, mas ~10% de madrugada (compras noturnas legítimas)
+        _hr = np.concatenate([np.random.randint(0, 6, int(n*0.10)),
+                              np.random.randint(6, 24, n - int(n*0.10))])
+        np.random.shuffle(_hr)
+        hour = _hr
+        failed            = np.random.choice([0,1,2,3,4], n, p=[0.38, 0.30, 0.18, 0.09, 0.05])
+        ip_risk           = np.random.beta(2.6, 4.2, n)             # risco baixo-moderado, sobrepõe
+        is_intl           = np.random.binomial(1, 0.10, n)
+        logins            = np.random.choice(range(1, 10), n, p=[0.18,0.22,0.19,0.14,0.10,0.07,0.05,0.03,0.02])
 
     return pd.DataFrame({
         'transaction_amount':       transaction_amt.round(2),
