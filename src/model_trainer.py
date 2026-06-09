@@ -6,15 +6,17 @@ from pathlib import Path
 from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score, average_precision_score, accuracy_score
+from mlflow.tracking import MlflowClient
 
 class ModelTrainer:
     """Classe para treinar modelos e registrar no MLflow."""
-    
+
     def __init__(self, models_path: Path):
         self.models_path = Path(models_path)
         self.models_path.mkdir(parents=True, exist_ok=True)
 
-    def train_models(self, X_train, y_train, X_test, y_test, params: dict, experiment_name: str):
+    def train_models(self, X_train, y_train, X_test, y_test, params: dict, experiment_name: str,
+                     preprocessor_path: Path = None):
         mlflow.set_experiment(experiment_name)
         results = {}
 
@@ -67,19 +69,37 @@ class ModelTrainer:
                 mlflow.log_param("model_type", model_name)
                 if model_name == 'xgboost':
                     mlflow.log_param("scale_pos_weight", scale_pos_weight)
-                
-                # Registra os parâmetros que vieram do params.yaml
+
                 mlflow.log_params(params.get(model_name, {}))
                 mlflow.log_metrics(metrics)
                 mlflow.sklearn.log_model(model, model_name)
 
+                if preprocessor_path and Path(preprocessor_path).exists():
+                    mlflow.log_artifact(str(preprocessor_path), "preprocessor")
+
+                run_id = mlflow.active_run().info.run_id
+
                 # Salvar o modelo em disco (.joblib)
                 model_path = self.models_path / f"{model_name}.joblib"
                 joblib.dump(model, model_path)
-                
+
                 results[model_name] = {
                     'metrics': metrics,
-                    'path': model_path
+                    'path': model_path,
+                    'run_id': run_id,
                 }
-                
+
+        # Registrar o campeão no MLflow Model Registry
+        best_name = max(results, key=lambda m: results[m]['metrics']['roc_auc'])
+        best_run_id = results[best_name]['run_id']
+        best_auc = results[best_name]['metrics']['roc_auc']
+
+        print(f"\nRegistrando campeão: {best_name} (ROC-AUC: {best_auc:.4f})")
+        model_uri = f"runs:/{best_run_id}/{best_name}"
+        registered = mlflow.register_model(model_uri, "fraud_detection_champion")
+
+        client = MlflowClient()
+        client.set_registered_model_alias("fraud_detection_champion", "champion", registered.version)
+        print(f"Alias 'champion' setado na versão {registered.version}")
+
         return results

@@ -31,7 +31,8 @@ def main():
     results = trainer.train_models(
         X_train, y_train, X_test, y_test,
         params=params,
-        experiment_name=MODEL_NAME
+        experiment_name=MODEL_NAME,
+        preprocessor_path=PROCESSED_DATA_PATH / "preprocessor.joblib",
     )
 
     # Guardar métricas em metrics/scores.json (rastreado pelo DVC)

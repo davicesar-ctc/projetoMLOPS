@@ -8,3 +8,6 @@ scipy
 joblib
 PyYAML
 packaging<24
+fastapi
+uvicorn[standard]
+python-dotenv

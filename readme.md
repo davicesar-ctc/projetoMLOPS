@@ -1,73 +1,165 @@
 # Fraud Detection Pipeline (MLOps)
 
-Este projeto implementa um sistema de detecção de fraudes em pagamentos digitais utilizando técnicas modernas de MLOps. O foco principal é garantir a reprodutibilidade do experimento, o versionamento de dados e o rastreamento automatizado de métricas.
+Sistema de detecção de fraudes em pagamentos digitais com pipeline MLOps completo: treinamento reproduzível via DVC, rastreamento de experimentos com MLflow e API de predição em tempo real via FastAPI — tudo orquestrado com Docker.
 
-## Diferenciais do Projeto
+---
 
-Diferente de abordagens baseadas exclusivamente em notebooks, este projeto utiliza uma estrutura de engenharia de software:
+## Tecnologias
 
-* **DVC (Data Version Control):** Orquestração do pipeline de dados. O sistema identifica alterações em dados ou scripts e executa apenas as etapas necessárias.
-* **MLflow:** Rastreamento de experimentos, registro de hiperparâmetros e comparação visual de performance entre modelos.
-* **Estrutura Modular:** Código organizado em módulos Python (pasta src) e scripts de execução de pipeline, facilitando a manutenção e escala.
+| Camada | Tecnologia |
+|---|---|
+| Machine Learning | XGBoost, Random Forest (Scikit-Learn) |
+| Pipeline | DVC |
+| Experimentos | MLflow |
+| API | FastAPI + Uvicorn |
+| Infraestrutura | Docker + Docker Compose |
+| Linguagem | Python 3.12+ |
 
-## Tecnologias Utilizadas
+---
 
-* **Linguagem:** Python 3.12+
-* **Machine Learning:** XGBoost e Scikit-Learn (Random Forest)
-* **Orquestração de Pipeline:** DVC
-* **Rastreamento de Experimentos:** MLflow
-* **Gerenciamento de Ambiente:** Venv (Virtual Environment)
+## Passo a Passo para Executar
 
-## Estrutura do Repositório
+### 1. Instalar dependências (primeira vez)
 
-Plaintext
-├── data/               # Dados brutos (raw) e processados
-├── metrics/            # Resultados e scores dos modelos
-├── models/             # Modelos treinados (.joblib)
-├── pipeline/           # Scripts de execução das etapas do DVC
-├── src/                # Lógica central (Limpeza, Treino, Configurações)
-├── dvc.yaml            # Configuração do pipeline de dados
-├── params.yaml         # Hiperparâmetros centralizados
-└── requirements.txt    # Dependências do projeto
-
-
-## Instruções de Execução
-
-### 1. Configuração do Ambiente
-Criação do ambiente virtual e instalação das bibliotecas necessárias:
-
-# Criar o ambiente virtual
+```bash
 python -m venv .venv
-
-# Ativar o ambiente (Windows)
-.\.venv\Scripts\activate
-
-# Instalar dependências
+.\.venv\Scripts\activate      # Windows
 pip install -r requirements.txt
+```
 
-### 2. Execução do Pipeline
-Para executar todo o fluxo de processamento e treinamento definido no DVC:
+---
 
-*dvc repro*
+### 2. Subir o servidor MLflow (Docker)
 
-O DVC gerenciará as dependências entre os scripts e garantirá que o estado final seja alcançado.
+```bash
+docker-compose up mlflow -d
+```
 
-### 3. Análise de Resultados
-Para visualizar as métricas finais no terminal:
+Acesse a interface em: **http://localhost:5000**
 
-*dvc metrics show*
+---
 
-### 4. Para acessar a interface gráfica do MLflow e comparar os treinamentos realizados:
+### 3. Treinar os modelos
 
-*mlflow ui*
+```bash
+dvc repro
+```
 
-Após o comando, a interface estará disponível em http://localhost:5000.
+O que acontece por baixo:
+- Etapa 1 — **Pré-processamento**: limpa os dados, cria features e salva as matrizes de treino/teste
+- Etapa 2 — **Treino**: treina XGBoost e Random Forest, loga métricas e artefatos no MLflow, registra o modelo campeão no Model Registry com o alias `@champion`
 
-# Estratégia de Modelo
-O projeto utiliza um limiar de decisão (threshold) ajustado para priorizar a captura de transações fraudulentas. Esta abordagem conservadora visa reduzir o risco financeiro, aceitando um volume controlado de falsos positivos em troca de uma cobertura maior de fraudes reais.
+Para ver as métricas no terminal após o treino:
 
-# Próximos Passos
+```bash
+dvc metrics show
+```
 
-1 - Implementação de novas variáveis (Feature Engineering) baseadas no comportamento temporal das transações.
+---
 
-2 - Adiçao de novas amostras para aumentar a quantidade de fraudes e assim possivelmente melhorar o modelo. 
+### 4. Subir a API de predição (Docker)
+
+```bash
+docker-compose up api --build
+```
+
+Na inicialização, a API conecta ao MLflow, carrega o modelo campeão e o preprocessor diretamente do registry — sem usar arquivos locais.
+
+---
+
+### 5. Testar a API
+
+Acesse a interface interativa (Swagger): **http://localhost:8000/docs**
+
+No Swagger:
+1. Clique em `POST /predict`
+2. Clique em **"Try it out"**
+3. Os campos já vêm preenchidos com um exemplo suspeito
+4. Modifique os valores que quiser
+5. Clique em **"Execute"**
+
+Resposta esperada:
+```json
+{
+  "fraude_detectada": true,
+  "probabilidade": 0.9123,
+  "threshold": 0.1
+}
+```
+
+Verificar se a API está de pé:
+```bash
+curl http://localhost:8000/health
+```
+
+---
+
+## Campos do /predict
+
+| Campo | O que é | Valores aceitos |
+|---|---|---|
+| `valor_transacao` | Valor da transação em reais | 50 a 50000 |
+| `tipo_transacao` | Tipo da operação | `Pagamento` / `Transferência` / `Saque` |
+| `meio_pagamento` | Meio de pagamento | `Cartão` / `Banco Online` / `PIX` / `Carteira Digital` |
+| `tipo_dispositivo` | Dispositivo utilizado | `Android` / `iOS` / `Navegador` |
+| `localizacao` | Cidade da transação | `São Paulo` / `Rio de Janeiro` / `Brasília` / `Belo Horizonte` / `Salvador` |
+| `idade_conta_dias` | Dias desde a criação da conta | 10 a 1999 |
+| `hora_transacao` | Hora do dia | 0 a 23 |
+| `tentativas_falhas` | Tentativas de pagamento falhas anteriores | 0 a 4 |
+| `valor_medio_transacoes` | Média histórica de transações do usuário | 100 a 30000 |
+| `transacao_internacional` | É internacional? | `0` = Não / `1` = Sim |
+| `risco_ip` | Score de risco do IP | 0.0 (seguro) a 1.0 (suspeito) |
+| `tentativas_login_24h` | Logins nas últimas 24h | 1 a 9 |
+
+### Exemplos de perfis para teste
+
+**Perfil suspeito** → tende a retornar `fraude_detectada: true`
+```json
+{
+  "valor_transacao": 45000, "valor_medio_transacoes": 200,
+  "hora_transacao": 2, "risco_ip": 0.95,
+  "transacao_internacional": 1, "idade_conta_dias": 12,
+  "tentativas_falhas": 4, "tentativas_login_24h": 9,
+  "tipo_transacao": "Transferência", "meio_pagamento": "PIX",
+  "tipo_dispositivo": "Navegador", "localizacao": "São Paulo"
+}
+```
+
+**Perfil normal** → tende a retornar `fraude_detectada: false`
+```json
+{
+  "valor_transacao": 350, "valor_medio_transacoes": 500,
+  "hora_transacao": 14, "risco_ip": 0.05,
+  "transacao_internacional": 0, "idade_conta_dias": 900,
+  "tentativas_falhas": 0, "tentativas_login_24h": 2,
+  "tipo_transacao": "Pagamento", "meio_pagamento": "Cartão",
+  "tipo_dispositivo": "Android", "localizacao": "Rio de Janeiro"
+}
+```
+
+---
+
+## Estrutura do Projeto
+
+```
+├── api/                  # API FastAPI
+│   ├── app.py            # Endpoints /health e /predict
+│   └── Dockerfile
+├── data/raw/             # Dataset original
+├── pipeline/             # Scripts das etapas DVC
+│   ├── preprocess.py
+│   └── train.py
+├── src/                  # Lógica central
+│   ├── preprocessor.py   # Limpeza e feature engineering
+│   ├── model_trainer.py  # Treino + registro no MLflow
+│   └── config.py
+├── docker-compose.yml    # MLflow + API
+├── dvc.yaml              # Definição do pipeline
+└── params.yaml           # Hiperparâmetros
+```
+
+---
+
+## Estratégia do Modelo
+
+O threshold de decisão é **0.10** — intencionalmente baixo para maximizar a captura de fraudes (alto recall), aceitando mais falsos positivos. Em detecção de fraude financeira, deixar uma fraude passar é mais custoso do que bloquear uma transação legítima.

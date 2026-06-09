@@ -6,4 +6,23 @@ services:
       - "5000:5000"
     volumes:
       - ./mlruns:/mlruns
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlruns
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri file:///mlruns
+      --default-artifact-root /mlruns
+      --serve-artifacts
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: fraud_api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mlflow
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - FRAUD_THRESHOLD=0.10
